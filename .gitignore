@@ -1,0 +1,53 @@
+# Gradle
+.gradle/
+build/
+*/build/
+out/
+*/out/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# Fabric / NeoForge / Architectury caches
+run/
+runs/
+*/run/
+*/runs/
+.architectury-transformer/
+
+# Minecraft assets (downloaded by loom)
+.cache/
+*/.cache/
+
+# Yarn / Mappings cache
+mappings/
+
+# Generated sources
+.mixin.out/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Compiled output
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Logs
+logs/
+*.log
+
+# Local env
+local.properties
