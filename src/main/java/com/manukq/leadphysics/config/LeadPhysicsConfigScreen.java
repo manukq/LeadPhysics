@@ -80,7 +80,12 @@ public final class LeadPhysicsConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.fillGradient(0, 0, width, height, 0xC0101018, 0xD0101018);
+        int panelLeft = (width - 344) / 2;
+        int panelTop = 16;
+        int panelBottom = Math.min(height - 16, 16 + 260);
+        guiGraphics.fill(panelLeft, panelTop, panelLeft + 344, panelBottom, 0xB018181C);
+        guiGraphics.renderOutline(panelLeft, panelTop, 344, panelBottom - panelTop, 0xFF3A2A1E);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         int left = (width - 320) / 2;

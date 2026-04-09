@@ -21,13 +21,13 @@ import org.joml.Matrix4f;
 
 public final class LeadRenderHandler {
 
-    private static final float RIBBON_HALF_WIDTH = 0.045f;
-    private static final float PRISM_RADIUS = 0.035f;
+    private static final float RIBBON_HALF_WIDTH = 0.042f;
+    private static final float PRISM_RADIUS = 0.023f;
     private static final int ALPHA = 255;
-    private static final int DARK = 0x5A3A1F;
-    private static final int MID = 0x7A5230;
-    private static final int LIGHT = 0xA67C52;
-    private static final int TOP = 0xC49A6C;
+    private static final int DARK = 0x4A2E18;
+    private static final int MID = 0x5A3A1F;
+    private static final int LIGHT = 0x7A5230;
+    private static final int TOP = 0xA67C52;
 
     private LeadRenderHandler() {}
 
@@ -139,8 +139,8 @@ public final class LeadRenderHandler {
         Vec3 b10 = b.subtract(axisA).subtract(axisB).subtract(camera);
         Vec3 b11 = b.subtract(axisA).add(axisB).subtract(camera);
 
-        quad(buffer, entry, matrix, a00, a01, b01, b00, axisA, light0, light1, LIGHT);
-        quad(buffer, entry, matrix, a01, a10, b10, b01, axisB.scale(-1.0), light0, light1, MID);
+        quad(buffer, entry, matrix, a00, a01, b01, b00, axisA, light0, light1, MID);
+        quad(buffer, entry, matrix, a01, a10, b10, b01, axisB.scale(-1.0), light0, light1, DARK);
         quad(buffer, entry, matrix, a10, a11, b11, b10, axisA.scale(-1.0), light0, light1, DARK);
         quad(buffer, entry, matrix, a11, a00, b00, b11, axisB, light0, light1, TOP);
     }
