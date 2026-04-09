@@ -13,7 +13,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -28,10 +27,11 @@ public final class LeadPhysicsConfigScreen extends Screen {
     private final Screen parent;
     private CycleButton<Boolean> enabledButton;
     private CycleButton<LeadPhysicsConfig.RenderMode> renderModeButton;
-    private EditBox amplitudeBox;
+    private CycleButton<Double> amplitudeButton;
     private Button saveButton;
     private List<Component> credits;
-    private String amplitudeError;
+
+    private static final List<Double> AMPLITUDES = List.of(0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0);
 
     public LeadPhysicsConfigScreen(Screen parent) {
         super(Component.literal("LeadPhysics"));
@@ -59,12 +59,11 @@ public final class LeadPhysicsConfigScreen extends Screen {
             .create(left, y, panelWidth, 20, Component.literal("Lead Render"), (button, value) -> {}));
         y += 28;
 
-        amplitudeBox = addRenderableWidget(new EditBox(font, left, y, panelWidth, 20, Component.literal("Physics Amplitude")));
-        amplitudeBox.setMaxLength(8);
-        amplitudeBox.setValue(formatAmplitude(config.getPhysicsAmplitude()));
-        amplitudeBox.setResponder(value -> updateAmplitudeState());
-        updateAmplitudeState();
-        y += 34;
+        amplitudeButton = addRenderableWidget(CycleButton.builder(this::amplitudeName)
+            .withValues(AMPLITUDES)
+            .withInitialValue(closestAmplitude(config.getPhysicsAmplitude()))
+            .create(left, y, panelWidth, 20, Component.literal("Physics Strength"), (button, value) -> {}));
+        y += 28;
 
         int buttonWidth = (panelWidth - 8) / 2;
         saveButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> saveAndClose())
@@ -75,7 +74,7 @@ public final class LeadPhysicsConfigScreen extends Screen {
             .build());
 
         credits = readCredits();
-        setInitialFocus(amplitudeBox);
+        setInitialFocus(amplitudeButton);
     }
 
     @Override
@@ -91,12 +90,9 @@ public final class LeadPhysicsConfigScreen extends Screen {
         int left = (width - 320) / 2;
         int y = 20;
         guiGraphics.drawCenteredString(font, title, width / 2, y, 0xFFFFFF);
-        guiGraphics.drawString(font, Component.literal("Amplitude range: 0.0 - 3.0"), left, 102, 0xA0A0A0);
-        if (amplitudeError != null) {
-            guiGraphics.drawString(font, Component.literal(amplitudeError).withStyle(ChatFormatting.RED), left, 114, 0xFF5555);
-        }
+        guiGraphics.drawString(font, Component.literal("Choose the overall swing strength of the lead."), left, 102, 0xA0A0A0);
 
-        int creditsTop = 148;
+        int creditsTop = 136;
         guiGraphics.drawString(font, Component.literal("Credits").withStyle(ChatFormatting.GOLD), left, creditsTop, 0xFFD76A);
         int textY = creditsTop + 14;
         for (Component line : credits) {
@@ -125,42 +121,44 @@ public final class LeadPhysicsConfigScreen extends Screen {
     }
 
     private void saveAndClose() {
-        Double amplitude = parseAmplitude(amplitudeBox.getValue());
-        if (amplitude == null) {
-            updateAmplitudeState();
-            return;
-        }
         LeadPhysicsConfig config = LeadPhysicsConfig.getInstance();
         config.setEnabled(enabledButton.getValue());
         config.setRenderMode(renderModeButton.getValue());
-        config.setPhysicsAmplitude(amplitude);
+        config.setPhysicsAmplitude(amplitudeButton.getValue());
         config.save();
         onClose();
-    }
-
-    private void updateAmplitudeState() {
-        Double amplitude = parseAmplitude(amplitudeBox.getValue());
-        amplitudeError = amplitude == null ? "Enter a number from 0.0 to 3.0" : null;
-        if (saveButton != null) {
-            saveButton.active = amplitude != null;
-        }
-    }
-
-    private Double parseAmplitude(String value) {
-        try {
-            double parsed = Double.parseDouble(value.trim());
-            if (parsed < 0.0 || parsed > 3.0) {
-                return null;
-            }
-            return parsed;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
     }
 
     private String formatAmplitude(double value) {
         String text = String.format(java.util.Locale.ROOT, "%.2f", value);
         return text.indexOf('.') < 0 ? text : text.replaceAll("0+$", "").replaceAll("\\.$", "");
+    }
+
+    private Double closestAmplitude(double value) {
+        Double closest = AMPLITUDES.getFirst();
+        double bestDistance = Math.abs(closest - value);
+        for (Double amplitude : AMPLITUDES) {
+            double distance = Math.abs(amplitude - value);
+            if (distance < bestDistance) {
+                closest = amplitude;
+                bestDistance = distance;
+            }
+        }
+        return closest;
+    }
+
+    private Component amplitudeName(Double value) {
+        String label = formatAmplitude(value) + "x";
+        if (Math.abs(value - 0.5) < 0.001) {
+            label += " Soft";
+        } else if (Math.abs(value - 1.0) < 0.001) {
+            label += " Default";
+        } else if (Math.abs(value - 1.5) < 0.001) {
+            label += " Strong";
+        } else if (value >= 2.0) {
+            label += " Extreme";
+        }
+        return Component.literal(label);
     }
 
     private Component modeName(LeadPhysicsConfig.RenderMode mode) {

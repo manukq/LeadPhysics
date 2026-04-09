@@ -24,10 +24,8 @@ public final class LeadRenderHandler {
     private static final float RIBBON_HALF_WIDTH = 0.042f;
     private static final float PRISM_RADIUS = 0.023f;
     private static final int ALPHA = 255;
-    private static final int DARK = 0x4A2E18;
-    private static final int MID = 0x5A3A1F;
-    private static final int LIGHT = 0x7A5230;
-    private static final int TOP = 0xA67C52;
+    private static final int DARK = 0x664422;
+    private static final int LIGHT = 0xB58A54;
 
     private LeadRenderHandler() {}
 
@@ -75,10 +73,11 @@ public final class LeadRenderHandler {
 
             Vec3 a = point(points[i]);
             Vec3 b = point(points[i + 1]);
+            int baseColor = (i & 1) == 0 ? DARK : LIGHT;
             if (config.isThreeDimensional()) {
-                renderPrismSegment(buffer, entry, matrix, camera, a, b, light0, light1);
+                renderPrismSegment(buffer, entry, matrix, camera, a, b, light0, light1, baseColor);
             } else {
-                renderRibbonSegment(buffer, entry, matrix, camera, a, b, light0, light1);
+                renderRibbonSegment(buffer, entry, matrix, camera, a, b, light0, light1, baseColor);
             }
         }
     }
@@ -87,7 +86,7 @@ public final class LeadRenderHandler {
         return new Vec3(point.x, point.y, point.z);
     }
 
-    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, int light0, int light1) {
+    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, int light0, int light1, int color) {
         Vec3 tangent = b.subtract(a);
         if (tangent.lengthSqr() < 1.0e-8) {
             return;
@@ -103,24 +102,16 @@ public final class LeadRenderHandler {
         }
         side = side.normalize().scale(RIBBON_HALF_WIDTH);
         Vec3 normal = side.cross(tangent).normalize();
-        Vec3 band = side.scale(0.5);
 
         Vec3 a0 = a.add(side).subtract(camera);
-        Vec3 a1 = a.add(band).subtract(camera);
-        Vec3 a2 = a.subtract(band).subtract(camera);
-        Vec3 a3 = a.subtract(side).subtract(camera);
+        Vec3 a1 = a.subtract(side).subtract(camera);
         Vec3 b0 = b.add(side).subtract(camera);
-        Vec3 b1 = b.add(band).subtract(camera);
-        Vec3 b2 = b.subtract(band).subtract(camera);
-        Vec3 b3 = b.subtract(side).subtract(camera);
+        Vec3 b1 = b.subtract(side).subtract(camera);
 
-        quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, TOP);
-        quad(buffer, entry, matrix, a1, a2, b2, b1, normal, light0, light1, LIGHT);
-        quad(buffer, entry, matrix, a2, a3, b3, b2, normal, light0, light1, MID);
-        quad(buffer, entry, matrix, a3, a2, b2, b3, normal.scale(-1.0), light0, light1, DARK);
+        quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, color);
     }
 
-    private static void renderPrismSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, int light0, int light1) {
+    private static void renderPrismSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, int light0, int light1, int baseColor) {
         Vec3 tangent = b.subtract(a);
         if (tangent.lengthSqr() < 1.0e-8) {
             return;
@@ -139,10 +130,10 @@ public final class LeadRenderHandler {
         Vec3 b10 = b.subtract(axisA).subtract(axisB).subtract(camera);
         Vec3 b11 = b.subtract(axisA).add(axisB).subtract(camera);
 
-        quad(buffer, entry, matrix, a00, a01, b01, b00, axisA, light0, light1, MID);
-        quad(buffer, entry, matrix, a01, a10, b10, b01, axisB.scale(-1.0), light0, light1, DARK);
-        quad(buffer, entry, matrix, a10, a11, b11, b10, axisA.scale(-1.0), light0, light1, DARK);
-        quad(buffer, entry, matrix, a11, a00, b00, b11, axisB, light0, light1, TOP);
+        quad(buffer, entry, matrix, a00, a01, b01, b00, axisA, light0, light1, shade(baseColor, 0.92f));
+        quad(buffer, entry, matrix, a01, a10, b10, b01, axisB.scale(-1.0), light0, light1, shade(baseColor, 0.82f));
+        quad(buffer, entry, matrix, a10, a11, b11, b10, axisA.scale(-1.0), light0, light1, shade(baseColor, 0.74f));
+        quad(buffer, entry, matrix, a11, a00, b00, b11, axisB, light0, light1, shade(baseColor, 1.04f));
     }
 
     private static void quad(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 p1, Vec3 p2, Vec3 p3, Vec3 p4, Vec3 normal, int light0, int light1, int color) {
@@ -157,5 +148,12 @@ public final class LeadRenderHandler {
             .setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, ALPHA)
             .setLight(light)
             .setNormal(entry, (float) normal.x, (float) normal.y, (float) normal.z);
+    }
+
+    private static int shade(int color, float factor) {
+        int red = Mth.clamp((int) (((color >> 16) & 0xFF) * factor), 0, 255);
+        int green = Mth.clamp((int) (((color >> 8) & 0xFF) * factor), 0, 255);
+        int blue = Mth.clamp((int) ((color & 0xFF) * factor), 0, 255);
+        return (red << 16) | (green << 8) | blue;
     }
 }
