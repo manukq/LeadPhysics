@@ -1,5 +1,6 @@
 package com.manukq.leadphysics.mixin;
 
+import com.manukq.leadphysics.config.LeadPhysicsConfig;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.manukq.leadphysics.render.LeadRenderHandler;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -19,6 +20,9 @@ public final class EntityRenderDispatcherMixin {
         at = @At("TAIL")
     )
     private <E extends Entity> void renderCustomLead(E entity, double x, double y, double z, float tickDelta, PoseStack poseStack, MultiBufferSource buffers, int light, CallbackInfo ci) {
+        if (!LeadPhysicsConfig.getInstance().isEnabled()) {
+            return;
+        }
         if (!(entity instanceof Leashable leashable)) {
             return;
         }

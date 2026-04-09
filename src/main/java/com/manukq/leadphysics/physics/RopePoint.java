@@ -20,6 +20,12 @@ public final class RopePoint {
         this.pinned = pinned;
     }
 
+    public void setPos(double x, double y, double z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
     public void pin(double x, double y, double z) {
         if (!pinned) {
             return;

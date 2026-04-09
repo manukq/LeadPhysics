@@ -7,6 +7,6 @@ public final class LeadPhysicsModMenu implements ModMenuApi {
 
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        return parent -> parent;
+        return LeadPhysicsConfigScreen::create;
     }
 }
