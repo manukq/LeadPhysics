@@ -4,6 +4,7 @@
   "version": "${version}",
   "name": "LeadPhysics",
   "description": "Physical lead simulation with configurable rendering and collisions.",
+  "icon": "assets/leadphysics/icon.png",
   "authors": [
     "Manukq"
   ],
@@ -36,7 +37,6 @@
     "fabric-api": "*",
     "minecraft": "~1.21.8",
     "java": ">=21",
-    "modmenu": "*",
-    "cloth-config": "*"
+    "modmenu": "*"
   }
 }

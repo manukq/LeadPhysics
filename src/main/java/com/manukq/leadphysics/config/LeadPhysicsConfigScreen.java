@@ -8,61 +8,164 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import me.shedaniel.clothconfig2.api.ConfigBuilder;
-import me.shedaniel.clothconfig2.api.ConfigCategory;
-import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 
-public final class LeadPhysicsConfigScreen {
+public final class LeadPhysicsConfigScreen extends Screen {
 
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[(.+?)]\\((.+?)\\)");
 
-    private LeadPhysicsConfigScreen() {}
+    private final Screen parent;
+    private CycleButton<Boolean> enabledButton;
+    private CycleButton<LeadPhysicsConfig.RenderMode> renderModeButton;
+    private EditBox amplitudeBox;
+    private Button saveButton;
+    private List<Component> credits;
+    private String amplitudeError;
 
-    public static Screen create(Screen parent) {
-        LeadPhysicsConfig config = LeadPhysicsConfig.getInstance();
-        ConfigBuilder builder = ConfigBuilder.create()
-            .setParentScreen(parent)
-            .setTitle(Component.literal("LeadPhysics"))
-            .setSavingRunnable(config::save)
-            .setTransparentBackground(true);
-
-        ConfigEntryBuilder entries = builder.entryBuilder();
-        ConfigCategory general = builder.getOrCreateCategory(Component.literal("General"));
-        general.addEntry(entries.startBooleanToggle(Component.literal("Enabled"), config.isEnabled())
-            .setDefaultValue(true)
-            .setSaveConsumer(config::setEnabled)
-            .build());
-        general.addEntry(entries.startEnumSelector(Component.literal("Lead Render"), LeadPhysicsConfig.RenderMode.class, config.getRenderMode())
-            .setDefaultValue(LeadPhysicsConfig.RenderMode.THREE_D)
-            .setEnumNameProvider(mode -> switch ((LeadPhysicsConfig.RenderMode) mode) {
-                case TWO_D -> Component.literal("2D");
-                case THREE_D -> Component.literal("3D");
-            })
-            .setSaveConsumer(config::setRenderMode)
-            .build());
-        general.addEntry(entries.startDoubleField(Component.literal("Physics Amplitude"), config.getPhysicsAmplitude())
-            .setDefaultValue(1.0)
-            .setMin(0.0)
-            .setMax(3.0)
-            .setSaveConsumer(config::setPhysicsAmplitude)
-            .build());
-
-        ConfigCategory credits = builder.getOrCreateCategory(Component.literal("Credits"));
-        for (Component line : readCredits()) {
-            credits.addEntry(entries.startTextDescription(line).build());
-        }
-
-        return builder.build();
+    public LeadPhysicsConfigScreen(Screen parent) {
+        super(Component.literal("LeadPhysics"));
+        this.parent = parent;
     }
 
-    private static List<Component> readCredits() {
+    public static Screen create(Screen parent) {
+        return new LeadPhysicsConfigScreen(parent);
+    }
+
+    @Override
+    protected void init() {
+        LeadPhysicsConfig config = LeadPhysicsConfig.getInstance();
+        int panelWidth = 320;
+        int left = (width - panelWidth) / 2;
+        int y = 46;
+
+        enabledButton = addRenderableWidget(CycleButton.onOffBuilder(config.isEnabled())
+            .create(left, y, panelWidth, 20, Component.literal("Mod Enabled"), (button, value) -> {}));
+        y += 28;
+
+        renderModeButton = addRenderableWidget(CycleButton.builder(this::modeName)
+            .withValues(LeadPhysicsConfig.RenderMode.values())
+            .withInitialValue(config.getRenderMode())
+            .create(left, y, panelWidth, 20, Component.literal("Lead Render"), (button, value) -> {}));
+        y += 28;
+
+        amplitudeBox = addRenderableWidget(new EditBox(font, left, y, panelWidth, 20, Component.literal("Physics Amplitude")));
+        amplitudeBox.setMaxLength(8);
+        amplitudeBox.setValue(formatAmplitude(config.getPhysicsAmplitude()));
+        amplitudeBox.setResponder(value -> updateAmplitudeState());
+        updateAmplitudeState();
+        y += 34;
+
+        int buttonWidth = (panelWidth - 8) / 2;
+        saveButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> saveAndClose())
+            .bounds(left, y, buttonWidth, 20)
+            .build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> onClose())
+            .bounds(left + buttonWidth + 8, y, buttonWidth, 20)
+            .build());
+
+        credits = readCredits();
+        setInitialFocus(amplitudeBox);
+    }
+
+    @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
+
+        int left = (width - 320) / 2;
+        int y = 20;
+        guiGraphics.drawCenteredString(font, title, width / 2, y, 0xFFFFFF);
+        guiGraphics.drawString(font, Component.literal("Amplitude range: 0.0 - 3.0"), left, 102, 0xA0A0A0);
+        if (amplitudeError != null) {
+            guiGraphics.drawString(font, Component.literal(amplitudeError).withStyle(ChatFormatting.RED), left, 114, 0xFF5555);
+        }
+
+        int creditsTop = 148;
+        guiGraphics.drawString(font, Component.literal("Credits").withStyle(ChatFormatting.GOLD), left, creditsTop, 0xFFD76A);
+        int textY = creditsTop + 14;
+        for (Component line : credits) {
+            guiGraphics.drawWordWrap(font, line, left, textY, 320, 0xE0E0E0);
+            textY += Math.max(12, font.wordWrapHeight(line, 320) + 2);
+            if (textY > height - 12) {
+                break;
+            }
+        }
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == 257 || keyCode == 335) {
+            saveAndClose();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void onClose() {
+        if (minecraft != null) {
+            minecraft.setScreen(parent);
+        }
+    }
+
+    private void saveAndClose() {
+        Double amplitude = parseAmplitude(amplitudeBox.getValue());
+        if (amplitude == null) {
+            updateAmplitudeState();
+            return;
+        }
+        LeadPhysicsConfig config = LeadPhysicsConfig.getInstance();
+        config.setEnabled(enabledButton.getValue());
+        config.setRenderMode(renderModeButton.getValue());
+        config.setPhysicsAmplitude(amplitude);
+        config.save();
+        onClose();
+    }
+
+    private void updateAmplitudeState() {
+        Double amplitude = parseAmplitude(amplitudeBox.getValue());
+        amplitudeError = amplitude == null ? "Enter a number from 0.0 to 3.0" : null;
+        if (saveButton != null) {
+            saveButton.active = amplitude != null;
+        }
+    }
+
+    private Double parseAmplitude(String value) {
+        try {
+            double parsed = Double.parseDouble(value.trim());
+            if (parsed < 0.0 || parsed > 3.0) {
+                return null;
+            }
+            return parsed;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private String formatAmplitude(double value) {
+        String text = String.format(java.util.Locale.ROOT, "%.2f", value);
+        return text.indexOf('.') < 0 ? text : text.replaceAll("0+$", "").replaceAll("\\.$", "");
+    }
+
+    private Component modeName(LeadPhysicsConfig.RenderMode mode) {
+        return switch (mode) {
+            case TWO_D -> Component.literal("2D");
+            case THREE_D -> Component.literal("3D");
+        };
+    }
+
+    private List<Component> readCredits() {
         List<Component> lines = new ArrayList<>();
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath("leadphysics", "credits.md");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(Minecraft.getInstance().getResourceManager().open(id), StandardCharsets.UTF_8))) {
@@ -80,7 +183,7 @@ public final class LeadPhysicsConfigScreen {
         return lines;
     }
 
-    private static Component parseMarkdown(String line) {
+    private Component parseMarkdown(String line) {
         String trimmed = line.trim();
         if (trimmed.startsWith("### ")) {
             return Component.literal(trimmed.substring(4)).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
@@ -97,7 +200,7 @@ public final class LeadPhysicsConfigScreen {
         return parseInlineMarkdown(trimmed);
     }
 
-    private static MutableComponent parseInlineMarkdown(String text) {
+    private MutableComponent parseInlineMarkdown(String text) {
         Matcher matcher = MARKDOWN_LINK.matcher(text);
         int cursor = 0;
         MutableComponent component = Component.empty();
@@ -105,9 +208,7 @@ public final class LeadPhysicsConfigScreen {
             if (matcher.start() > cursor) {
                 component.append(Component.literal(text.substring(cursor, matcher.start())).withStyle(ChatFormatting.WHITE));
             }
-            MutableComponent link = Component.literal(matcher.group(1))
-                .withStyle(Style.EMPTY.withColor(ChatFormatting.AQUA).withUnderlined(true));
-            component.append(link);
+            component.append(Component.literal(matcher.group(1)).withStyle(Style.EMPTY.withColor(ChatFormatting.AQUA).withUnderlined(true)));
             component.append(Component.literal(" (" + matcher.group(2) + ")").withStyle(ChatFormatting.DARK_GRAY));
             cursor = matcher.end();
         }
