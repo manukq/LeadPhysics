@@ -24,8 +24,8 @@ public final class LeadRenderHandler {
     private static final float RIBBON_HALF_WIDTH = 0.042f;
     private static final float PRISM_RADIUS = 0.023f;
     private static final int ALPHA = 255;
-    private static final int DARK = 0x664422;
-    private static final int LIGHT = 0xB58A54;
+    private static final int DARK = 0x6C4030;
+    private static final int LIGHT = 0xBC8A68;
 
     private LeadRenderHandler() {}
 
@@ -109,6 +109,7 @@ public final class LeadRenderHandler {
         Vec3 b1 = b.subtract(side).subtract(camera);
 
         quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, color);
+        quad(buffer, entry, matrix, b0, b1, a1, a0, normal.scale(-1.0), light1, light0, color);
     }
 
     private static void renderPrismSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, int light0, int light1, int baseColor) {
