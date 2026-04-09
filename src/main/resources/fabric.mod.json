@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "leadphysics",
+  "version": "${version}",
+  "name": "LeadPhysics",
+  "description": "Physical lead simulation with configurable rendering and collisions.",
+  "authors": [
+    "Manukq"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "contact": {
+    "sources": "https://github.com/manukek/LeadPhysics",
+    "issues": "https://github.com/manukek/LeadPhysics/issues"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.github": "https://github.com/manukek/LeadPhysics"
+      }
+    }
+  },
+  "entrypoints": {
+    "client": [
+      "com.manukq.leadphysics.LeadPhysicsClient"
+    ],
+    "modmenu": [
+      "com.manukq.leadphysics.config.LeadPhysicsModMenu"
+    ]
+  },
+  "mixins": [
+    "leadphysics.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.17.2",
+    "fabric-api": "*",
+    "minecraft": "~1.21.8",
+    "java": ">=21",
+    "modmenu": "*",
+    "cloth-config": "*"
+  }
+}
