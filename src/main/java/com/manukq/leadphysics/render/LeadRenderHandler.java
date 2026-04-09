@@ -58,6 +58,38 @@ public final class LeadRenderHandler {
         int endBlockLight = leashHolder.level().getBrightness(LightLayer.BLOCK, endLightPos);
         int startSkyLight = entity.level().getBrightness(LightLayer.SKY, startLightPos);
         int endSkyLight = leashHolder.level().getBrightness(LightLayer.SKY, endLightPos);
+        Vec3[] centers = new Vec3[points.length];
+        Vec3[] ribbonSides = config.isThreeDimensional() ? null : new Vec3[points.length];
+
+        for (int i = 0; i < points.length; i++) {
+            centers[i] = point(points[i]);
+        }
+
+        if (!config.isThreeDimensional()) {
+            for (int i = 0; i < centers.length; i++) {
+                Vec3 tangent;
+                if (i == 0) {
+                    tangent = centers[1].subtract(centers[0]);
+                } else if (i == centers.length - 1) {
+                    tangent = centers[i].subtract(centers[i - 1]);
+                } else {
+                    tangent = centers[i + 1].subtract(centers[i - 1]);
+                }
+                if (tangent.lengthSqr() < 1.0e-8) {
+                    tangent = new Vec3(1.0, 0.0, 0.0);
+                } else {
+                    tangent = tangent.normalize();
+                }
+                Vec3 side = tangent.cross(camera.subtract(centers[i]));
+                if (side.lengthSqr() < 1.0e-8) {
+                    side = tangent.cross(new Vec3(0.0, 1.0, 0.0));
+                }
+                if (side.lengthSqr() < 1.0e-8) {
+                    side = new Vec3(1.0, 0.0, 0.0);
+                }
+                ribbonSides[i] = side.normalize().scale(RIBBON_HALF_WIDTH);
+            }
+        }
 
         for (int i = 0; i < points.length - 1; i++) {
             float progress0 = (float) i / (points.length - 1);
@@ -71,13 +103,13 @@ public final class LeadRenderHandler {
                 Mth.lerpInt(progress1, startSkyLight, endSkyLight)
             );
 
-            Vec3 a = point(points[i]);
-            Vec3 b = point(points[i + 1]);
+            Vec3 a = centers[i];
+            Vec3 b = centers[i + 1];
             int baseColor = (i & 1) == 0 ? DARK : LIGHT;
             if (config.isThreeDimensional()) {
                 renderPrismSegment(buffer, entry, matrix, camera, a, b, light0, light1, baseColor);
             } else {
-                renderRibbonSegment(buffer, entry, matrix, camera, a, b, light0, light1, baseColor);
+                renderRibbonSegment(buffer, entry, matrix, camera, a, b, ribbonSides[i], ribbonSides[i + 1], light0, light1, baseColor);
             }
         }
     }
@@ -86,27 +118,30 @@ public final class LeadRenderHandler {
         return new Vec3(point.x, point.y, point.z);
     }
 
-    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, int light0, int light1, int color) {
+    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, Vec3 sideA, Vec3 sideB, int light0, int light1, int color) {
         Vec3 tangent = b.subtract(a);
         if (tangent.lengthSqr() < 1.0e-8) {
             return;
         }
         tangent = tangent.normalize();
-        Vec3 toCamera = camera.subtract(a);
-        Vec3 side = tangent.cross(toCamera);
-        if (side.lengthSqr() < 1.0e-8) {
-            side = tangent.cross(new Vec3(0.0, 1.0, 0.0));
+        Vec3 joinedSide = sideA.add(sideB);
+        if (joinedSide.lengthSqr() < 1.0e-8) {
+            joinedSide = sideA.lengthSqr() > 1.0e-8 ? sideA : sideB;
         }
-        if (side.lengthSqr() < 1.0e-8) {
-            side = new Vec3(1.0, 0.0, 0.0);
+        Vec3 normal = joinedSide.cross(tangent);
+        if (normal.lengthSqr() < 1.0e-8) {
+            normal = tangent.cross(camera.subtract(a));
         }
-        side = side.normalize().scale(RIBBON_HALF_WIDTH);
-        Vec3 normal = side.cross(tangent).normalize();
+        if (normal.lengthSqr() < 1.0e-8) {
+            normal = new Vec3(0.0, 1.0, 0.0);
+        } else {
+            normal = normal.normalize();
+        }
 
-        Vec3 a0 = a.add(side).subtract(camera);
-        Vec3 a1 = a.subtract(side).subtract(camera);
-        Vec3 b0 = b.add(side).subtract(camera);
-        Vec3 b1 = b.subtract(side).subtract(camera);
+        Vec3 a0 = a.add(sideA).subtract(camera);
+        Vec3 a1 = a.subtract(sideA).subtract(camera);
+        Vec3 b0 = b.add(sideB).subtract(camera);
+        Vec3 b1 = b.subtract(sideB).subtract(camera);
 
         quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, color);
         quad(buffer, entry, matrix, b0, b1, a1, a0, normal.scale(-1.0), light1, light0, color);
