@@ -23,6 +23,7 @@ public final class LeadPhysicsConfig {
     private boolean enabled = true;
     private RenderMode renderMode = RenderMode.THREE_D;
     private double physicsAmplitude = 1.0;
+    private boolean blockCollision = true;
 
     public static LeadPhysicsConfig getInstance() {
         return INSTANCE;
@@ -39,9 +40,10 @@ public final class LeadPhysicsConfig {
                 save();
                 return;
             }
-            enabled = data.enabled;
+            enabled = data.enabled == null ? true : data.enabled;
             renderMode = data.renderMode == null ? RenderMode.THREE_D : data.renderMode;
-            physicsAmplitude = clampAmplitude(data.physicsAmplitude);
+            physicsAmplitude = clampAmplitude(data.physicsAmplitude == null ? 1.0 : data.physicsAmplitude);
+            blockCollision = data.blockCollision == null ? true : data.blockCollision;
         } catch (IOException ignored) {
         }
     }
@@ -50,7 +52,7 @@ public final class LeadPhysicsConfig {
         try {
             Files.createDirectories(PATH.getParent());
             try (Writer writer = Files.newBufferedWriter(PATH)) {
-                GSON.toJson(new Data(enabled, renderMode, clampAmplitude(physicsAmplitude)), writer);
+                GSON.toJson(new Data(enabled, renderMode, clampAmplitude(physicsAmplitude), blockCollision), writer);
             }
         } catch (IOException ignored) {
         }
@@ -84,9 +86,17 @@ public final class LeadPhysicsConfig {
         this.physicsAmplitude = clampAmplitude(physicsAmplitude);
     }
 
+    public boolean isBlockCollisionEnabled() {
+        return blockCollision;
+    }
+
+    public void setBlockCollision(boolean blockCollision) {
+        this.blockCollision = blockCollision;
+    }
+
     private double clampAmplitude(double value) {
         return Math.max(0.0, Math.min(3.0, value));
     }
 
-    private record Data(boolean enabled, RenderMode renderMode, double physicsAmplitude) {}
+    private record Data(Boolean enabled, RenderMode renderMode, Double physicsAmplitude, Boolean blockCollision) {}
 }

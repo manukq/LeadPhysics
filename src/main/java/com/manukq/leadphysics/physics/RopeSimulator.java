@@ -2,6 +2,7 @@ package com.manukq.leadphysics.physics;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -12,22 +13,32 @@ public final class RopeSimulator {
     public static final int SEGMENTS = 32;
     private static final int CONSTRAINT_ITERS = 14;
     private static final double BASE_GRAVITY = 0.006;
-    private static final double DAMPING = 0.985;
-    private static final double BASE_OSCILLATION_AMPLITUDE = 0.0018;
-    private static final double OSCILLATION_SPEED = 0.08;
+    private static final double DAMPING = 0.972;
+    private static final double SLEEP_VELOCITY_SQR = 1.0e-6;
+    private static final double SLEEP_ANCHOR_DELTA = 0.0025;
+    private static final int SLEEP_TICKS = 12;
+    private static final double PLAYER_INFLUENCE_RADIUS = 0.35;
+    private static final double PLAYER_STEP_HORIZONTAL_RADIUS = 0.2;
+    private static final double PLAYER_STEP_HEIGHT_BELOW = 0.1;
+    private static final double PLAYER_STEP_HEIGHT_ABOVE = 0.16;
+    private static final double PLAYER_STEP_DOWNWARD = 0.018;
+    private static final double PLAYER_STEP_DRAG = 0.12;
     private static final double POINT_RADIUS = 0.06;
 
     private final RopePoint[] points;
     private double restSegmentLength;
     private long tickCount;
+    private Vec3 lastStart = Vec3.ZERO;
+    private Vec3 lastEnd = Vec3.ZERO;
+    private int stillTicks;
+    private boolean sleeping;
 
     public RopeSimulator(Vec3 start, Vec3 end) {
         points = new RopePoint[SEGMENTS + 1];
         seed(start, end, 1.0);
     }
 
-    public void update(Level level, Vec3 start, Vec3 end, double amplitude) {
-        tickCount++;
+    public void update(Level level, Vec3 start, Vec3 end, double amplitude, boolean blockCollisionEnabled) {
         double clampedAmplitude = Math.max(0.0, Math.min(3.0, amplitude));
         double distance = start.distanceTo(end);
         restSegmentLength = Math.max(distance / SEGMENTS, 0.04);
@@ -39,32 +50,63 @@ public final class RopeSimulator {
         points[0].pin(start.x, start.y, start.z);
         points[SEGMENTS].pin(end.x, end.y, end.z);
 
+        double anchorMotion = start.distanceTo(lastStart) + end.distanceTo(lastEnd);
+        if (anchorMotion > SLEEP_ANCHOR_DELTA) {
+            sleeping = false;
+            stillTicks = 0;
+        }
+
+        boolean disturbedByPlayer = applyPlayerDisturbance(level, clampedAmplitude);
+        if (disturbedByPlayer) {
+            sleeping = false;
+            stillTicks = 0;
+        }
+
+        if (sleeping) {
+            lastStart = start;
+            lastEnd = end;
+            return;
+        }
+
         double gravity = BASE_GRAVITY * clampedAmplitude;
-        double oscillationAmplitude = BASE_OSCILLATION_AMPLITUDE * clampedAmplitude;
+        double maxVelocitySqr = 0.0;
 
         for (int i = 1; i < SEGMENTS; i++) {
             RopePoint point = points[i];
             double velocityX = (point.x - point.prevX) * DAMPING;
             double velocityY = (point.y - point.prevY) * DAMPING;
             double velocityZ = (point.z - point.prevZ) * DAMPING;
-            double phase = tickCount * OSCILLATION_SPEED + i * Math.PI / SEGMENTS;
-            double oscillationX = Math.sin(phase) * oscillationAmplitude;
-            double oscillationZ = Math.cos(phase * 0.7) * oscillationAmplitude;
+            maxVelocitySqr = Math.max(maxVelocitySqr, velocityX * velocityX + velocityY * velocityY + velocityZ * velocityZ);
 
             point.prevX = point.x;
             point.prevY = point.y;
             point.prevZ = point.z;
-            point.x += velocityX + oscillationX;
+            point.x += velocityX;
             point.y += velocityY - gravity;
-            point.z += velocityZ + oscillationZ;
+            point.z += velocityZ;
         }
 
         for (int iteration = 0; iteration < CONSTRAINT_ITERS; iteration++) {
             constrainDistance();
-            resolveBlockCollisions(level);
+            if (blockCollisionEnabled) {
+                resolveBlockCollisions(level);
+            }
             points[0].pin(start.x, start.y, start.z);
             points[SEGMENTS].pin(end.x, end.y, end.z);
         }
+
+        if (anchorMotion <= SLEEP_ANCHOR_DELTA && maxVelocitySqr <= SLEEP_VELOCITY_SQR) {
+            stillTicks++;
+            if (stillTicks >= SLEEP_TICKS) {
+                sleeping = true;
+                settle();
+            }
+        } else {
+            stillTicks = 0;
+        }
+
+        lastStart = start;
+        lastEnd = end;
     }
 
     public RopePoint[] getPoints() {
@@ -83,6 +125,67 @@ public final class RopeSimulator {
                 Mth.lerp(t, start.z, end.z),
                 i == 0 || i == SEGMENTS
             );
+        }
+        lastStart = start;
+        lastEnd = end;
+        stillTicks = 0;
+        sleeping = false;
+    }
+
+    private boolean applyPlayerDisturbance(Level level, double amplitude) {
+        AABB ropeBounds = createBounds().inflate(PLAYER_INFLUENCE_RADIUS);
+        boolean disturbed = false;
+        for (Player player : level.getEntitiesOfClass(Player.class, ropeBounds, Player::isAlive)) {
+            if (!player.onGround()) {
+                continue;
+            }
+            AABB bounds = player.getBoundingBox();
+            double footY = bounds.minY;
+            Vec3 movement = player.getDeltaMovement();
+            Vec3 horizontalMovement = new Vec3(movement.x, 0.0, movement.z);
+            for (int i = 3; i < SEGMENTS - 2; i++) {
+                RopePoint point = points[i];
+                if (point.y < footY - PLAYER_STEP_HEIGHT_BELOW || point.y > footY + PLAYER_STEP_HEIGHT_ABOVE) {
+                    continue;
+                }
+                double horizontalDistanceSqr = horizontalDistanceSqr(point, bounds);
+                if (horizontalDistanceSqr > PLAYER_STEP_HORIZONTAL_RADIUS * PLAYER_STEP_HORIZONTAL_RADIUS) {
+                    continue;
+                }
+                double pressure = 1.0 - Math.sqrt(horizontalDistanceSqr) / PLAYER_STEP_HORIZONTAL_RADIUS;
+                point.y -= PLAYER_STEP_DOWNWARD * (0.6 + amplitude * 0.2) * pressure;
+                if (horizontalMovement.lengthSqr() > 1.0e-5) {
+                    point.x += horizontalMovement.x * PLAYER_STEP_DRAG * pressure;
+                    point.z += horizontalMovement.z * PLAYER_STEP_DRAG * pressure;
+                }
+                disturbed = true;
+            }
+        }
+        return disturbed;
+    }
+
+    private double horizontalDistanceSqr(RopePoint point, AABB bounds) {
+        double closestX = Mth.clamp(point.x, bounds.minX, bounds.maxX);
+        double closestZ = Mth.clamp(point.z, bounds.minZ, bounds.maxZ);
+        double dx = point.x - closestX;
+        double dz = point.z - closestZ;
+        return dx * dx + dz * dz;
+    }
+
+    private AABB createBounds() {
+        AABB bounds = new AABB(points[0].x, points[0].y, points[0].z, points[0].x, points[0].y, points[0].z);
+        for (int i = 1; i <= SEGMENTS; i++) {
+            bounds = bounds.minmax(new AABB(points[i].x, points[i].y, points[i].z, points[i].x, points[i].y, points[i].z));
+        }
+        return bounds;
+    }
+
+    private void settle() {
+        for (int i = 1; i < SEGMENTS; i++) {
+            RopePoint point = points[i];
+            point.prevX = point.x;
+            point.prevY = point.y;
+            point.prevZ = point.z;
         }
     }
 

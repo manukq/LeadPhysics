@@ -26,6 +26,7 @@ public final class LeadPhysicsConfigScreen extends Screen {
 
     private final Screen parent;
     private CycleButton<Boolean> enabledButton;
+    private CycleButton<Boolean> blockCollisionButton;
     private CycleButton<LeadPhysicsConfig.RenderMode> renderModeButton;
     private CycleButton<Double> amplitudeButton;
     private Button saveButton;
@@ -57,6 +58,10 @@ public final class LeadPhysicsConfigScreen extends Screen {
             .withValues(LeadPhysicsConfig.RenderMode.values())
             .withInitialValue(config.getRenderMode())
             .create(left, y, panelWidth, 20, Component.literal("Lead Render"), (button, value) -> {}));
+        y += 28;
+
+        blockCollisionButton = addRenderableWidget(CycleButton.onOffBuilder(config.isBlockCollisionEnabled())
+            .create(left, y, panelWidth, 20, Component.literal("Block Collision"), (button, value) -> {}));
         y += 28;
 
         amplitudeButton = addRenderableWidget(CycleButton.builder(this::amplitudeName)
@@ -124,6 +129,7 @@ public final class LeadPhysicsConfigScreen extends Screen {
         LeadPhysicsConfig config = LeadPhysicsConfig.getInstance();
         config.setEnabled(enabledButton.getValue());
         config.setRenderMode(renderModeButton.getValue());
+        config.setBlockCollision(blockCollisionButton.getValue());
         config.setPhysicsAmplitude(amplitudeButton.getValue());
         config.save();
         onClose();
