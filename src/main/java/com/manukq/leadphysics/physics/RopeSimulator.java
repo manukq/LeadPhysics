@@ -24,6 +24,7 @@ public final class RopeSimulator {
     private static final double PLAYER_STEP_DOWNWARD = 0.018;
     private static final double PLAYER_STEP_DRAG = 0.12;
     private static final double POINT_RADIUS = 0.06;
+    private static final double COLLISION_BIAS = 0.0025;
 
     private final RopePoint[] points;
     private double restSegmentLength;
@@ -70,6 +71,7 @@ public final class RopeSimulator {
 
         double gravity = BASE_GRAVITY * clampedAmplitude;
         double maxVelocitySqr = 0.0;
+        boolean[] collided = blockCollisionEnabled ? new boolean[SEGMENTS + 1] : null;
 
         for (int i = 1; i < SEGMENTS; i++) {
             RopePoint point = points[i];
@@ -89,10 +91,14 @@ public final class RopeSimulator {
         for (int iteration = 0; iteration < CONSTRAINT_ITERS; iteration++) {
             constrainDistance();
             if (blockCollisionEnabled) {
-                resolveBlockCollisions(level);
+                resolveBlockCollisions(level, collided);
             }
             points[0].pin(start.x, start.y, start.z);
             points[SEGMENTS].pin(end.x, end.y, end.z);
+        }
+
+        if (collided != null) {
+            dampCollidedPoints(collided);
         }
 
         if (anchorMotion <= SLEEP_ANCHOR_DELTA && maxVelocitySqr <= SLEEP_VELOCITY_SQR) {
@@ -218,7 +224,7 @@ public final class RopeSimulator {
         }
     }
 
-    private void resolveBlockCollisions(Level level) {
+    private void resolveBlockCollisions(Level level, boolean[] collided) {
         for (int i = 1; i < SEGMENTS; i++) {
             RopePoint point = points[i];
             int minX = Mth.floor(point.x - POINT_RADIUS);
@@ -242,10 +248,23 @@ public final class RopeSimulator {
                                 continue;
                             }
                             resolvePointAgainstBox(point, worldBox);
+                            collided[i] = true;
                         }
                     }
                 }
             }
+        }
+    }
+
+    private void dampCollidedPoints(boolean[] collided) {
+        for (int i = 1; i < SEGMENTS; i++) {
+            if (!collided[i]) {
+                continue;
+            }
+            RopePoint point = points[i];
+            point.prevX = Mth.lerp(0.75, point.prevX, point.x);
+            point.prevY = Mth.lerp(0.75, point.prevY, point.y);
+            point.prevZ = Mth.lerp(0.75, point.prevZ, point.z);
         }
     }
 
@@ -290,12 +309,12 @@ public final class RopeSimulator {
         }
 
         switch (direction) {
-            case UP -> point.setPos(point.x, box.maxY + POINT_RADIUS, point.z);
-            case DOWN -> point.setPos(point.x, box.minY - POINT_RADIUS, point.z);
-            case LEFT -> point.setPos(box.minX - POINT_RADIUS, point.y, point.z);
-            case RIGHT -> point.setPos(box.maxX + POINT_RADIUS, point.y, point.z);
-            case BACK -> point.setPos(point.x, point.y, box.minZ - POINT_RADIUS);
-            case FRONT -> point.setPos(point.x, point.y, box.maxZ + POINT_RADIUS);
+            case UP -> point.setPos(point.x, box.maxY + POINT_RADIUS + COLLISION_BIAS, point.z);
+            case DOWN -> point.setPos(point.x, box.minY - POINT_RADIUS - COLLISION_BIAS, point.z);
+            case LEFT -> point.setPos(box.minX - POINT_RADIUS - COLLISION_BIAS, point.y, point.z);
+            case RIGHT -> point.setPos(box.maxX + POINT_RADIUS + COLLISION_BIAS, point.y, point.z);
+            case BACK -> point.setPos(point.x, point.y, box.minZ - POINT_RADIUS - COLLISION_BIAS);
+            case FRONT -> point.setPos(point.x, point.y, box.maxZ + POINT_RADIUS + COLLISION_BIAS);
         }
 
         point.prevX = point.x;

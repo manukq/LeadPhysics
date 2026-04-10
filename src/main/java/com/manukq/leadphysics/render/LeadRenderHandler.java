@@ -22,8 +22,8 @@ import org.joml.Matrix4f;
 public final class LeadRenderHandler {
 
     private static final float RIBBON_HALF_WIDTH = 0.042f;
-    private static final float PRISM_HALF_WIDTH = 0.042f;
-    private static final float PRISM_HALF_HEIGHT = 0.022f;
+    private static final float PRISM_RADIUS = 0.023f;
+    private static final double SEGMENT_OVERLAP = 0.0015;
     private static final int ALPHA = 255;
     private static final int DARK = 0x574634;
     private static final int LIGHT = 0x7E634A;
@@ -60,72 +60,68 @@ public final class LeadRenderHandler {
         int startSkyLight = entity.level().getBrightness(LightLayer.SKY, startLightPos);
         int endSkyLight = leashHolder.level().getBrightness(LightLayer.SKY, endLightPos);
         Vec3[] centers = new Vec3[points.length];
-        Vec3[] ribbonSides = config.isThreeDimensional() ? null : new Vec3[points.length];
-        Vec3[] prismWidths = config.isThreeDimensional() ? new Vec3[points.length] : null;
-        Vec3[] prismHeights = config.isThreeDimensional() ? new Vec3[points.length] : null;
+        Vec3[] frameA = new Vec3[points.length];
+        Vec3[] frameB = new Vec3[points.length];
+        Vec3[] tangents = new Vec3[points.length];
 
         for (int i = 0; i < points.length; i++) {
             centers[i] = point(points[i]);
         }
 
-        if (!config.isThreeDimensional()) {
-            for (int i = 0; i < centers.length; i++) {
-                Vec3 tangent;
-                if (i == 0) {
-                    tangent = centers[1].subtract(centers[0]);
-                } else if (i == centers.length - 1) {
-                    tangent = centers[i].subtract(centers[i - 1]);
-                } else {
-                    tangent = centers[i + 1].subtract(centers[i - 1]);
-                }
-                if (tangent.lengthSqr() < 1.0e-8) {
-                    tangent = new Vec3(1.0, 0.0, 0.0);
-                } else {
-                    tangent = tangent.normalize();
-                }
-                Vec3 side = tangent.cross(camera.subtract(centers[i]));
-                if (side.lengthSqr() < 1.0e-8) {
-                    side = tangent.cross(new Vec3(0.0, 1.0, 0.0));
-                }
-                if (side.lengthSqr() < 1.0e-8) {
-                    side = new Vec3(1.0, 0.0, 0.0);
-                }
-                ribbonSides[i] = side.normalize().scale(RIBBON_HALF_WIDTH);
+        for (int i = 0; i < centers.length; i++) {
+            Vec3 tangent;
+            if (i == 0) {
+                tangent = centers[1].subtract(centers[0]);
+            } else if (i == centers.length - 1) {
+                tangent = centers[i].subtract(centers[i - 1]);
+            } else {
+                tangent = centers[i + 1].subtract(centers[i - 1]);
             }
-        } else {
-            for (int i = 0; i < centers.length; i++) {
-                Vec3 tangent;
-                if (i == 0) {
-                    tangent = centers[1].subtract(centers[0]);
-                } else if (i == centers.length - 1) {
-                    tangent = centers[i].subtract(centers[i - 1]);
-                } else {
-                    tangent = centers[i + 1].subtract(centers[i - 1]);
-                }
-                if (tangent.lengthSqr() < 1.0e-8) {
-                    tangent = new Vec3(1.0, 0.0, 0.0);
-                } else {
-                    tangent = tangent.normalize();
-                }
-                Vec3 toCamera = camera.subtract(centers[i]);
-                Vec3 widthAxis = tangent.cross(toCamera);
-                if (widthAxis.lengthSqr() < 1.0e-8) {
-                    widthAxis = tangent.cross(new Vec3(0.0, 1.0, 0.0));
-                }
-                if (widthAxis.lengthSqr() < 1.0e-8) {
-                    widthAxis = new Vec3(1.0, 0.0, 0.0);
-                } else {
-                    widthAxis = widthAxis.normalize();
-                }
-                Vec3 heightAxis = widthAxis.cross(tangent);
-                if (heightAxis.lengthSqr() < 1.0e-8) {
-                    heightAxis = new Vec3(0.0, 1.0, 0.0);
-                } else {
-                    heightAxis = heightAxis.normalize();
-                }
-                prismWidths[i] = widthAxis.scale(PRISM_HALF_WIDTH);
-                prismHeights[i] = heightAxis.scale(PRISM_HALF_HEIGHT);
+            if (tangent.lengthSqr() < 1.0e-8) {
+                tangent = new Vec3(1.0, 0.0, 0.0);
+            } else {
+                tangent = tangent.normalize();
             }
+            tangents[i] = tangent;
+        }
+
+        Vec3 reference = Math.abs(tangents[0].y) > 0.9 ? new Vec3(0.0, 0.0, 1.0) : new Vec3(0.0, 1.0, 0.0);
+        Vec3 axisA = tangents[0].cross(reference);
+        if (axisA.lengthSqr() < 1.0e-8) {
+            axisA = tangents[0].cross(new Vec3(1.0, 0.0, 0.0));
+        }
+        axisA = axisA.normalize();
+        Vec3 axisB = tangents[0].cross(axisA).normalize();
+        frameA[0] = axisA;
+        frameB[0] = axisB;
+
+        for (int i = 1; i < centers.length; i++) {
+            Vec3 prevTangent = tangents[i - 1];
+            Vec3 tangent = tangents[i];
+            Vec3 transportedA = frameA[i - 1].subtract(tangent.scale(frameA[i - 1].dot(tangent)));
+            if (transportedA.lengthSqr() < 1.0e-8) {
+                transportedA = prevTangent.cross(tangent);
+            }
+            if (transportedA.lengthSqr() < 1.0e-8) {
+                transportedA = tangent.cross(frameB[i - 1]);
+            }
+            if (transportedA.lengthSqr() < 1.0e-8) {
+                Vec3 fallback = Math.abs(tangent.y) > 0.9 ? new Vec3(0.0, 0.0, 1.0) : new Vec3(0.0, 1.0, 0.0);
+                transportedA = tangent.cross(fallback);
+            }
+            transportedA = transportedA.normalize();
+            Vec3 transportedB = tangent.cross(transportedA);
+            if (transportedB.lengthSqr() < 1.0e-8) {
+                transportedB = frameB[i - 1];
+            } else {
+                transportedB = transportedB.normalize();
+            }
+            if (transportedA.dot(frameA[i - 1]) < 0.0) {
+                transportedA = transportedA.scale(-1.0);
+                transportedB = transportedB.scale(-1.0);
+            }
+            frameA[i] = transportedA;
+            frameB[i] = transportedB;
         }
 
         for (int i = 0; i < points.length - 1; i++) {
@@ -142,10 +138,11 @@ public final class LeadRenderHandler {
 
             Vec3 a = centers[i];
             Vec3 b = centers[i + 1];
+            int baseColor = (i & 1) == 0 ? DARK : LIGHT;
             if (config.isThreeDimensional()) {
-                renderPrismSegment(buffer, entry, matrix, camera, a, b, prismWidths[i], prismWidths[i + 1], prismHeights[i], prismHeights[i + 1], light0, light1);
+                renderPrismSegment(buffer, entry, matrix, camera, a, b, tangents[i], tangents[i + 1], frameA[i].scale(PRISM_RADIUS), frameA[i + 1].scale(PRISM_RADIUS), frameB[i].scale(PRISM_RADIUS), frameB[i + 1].scale(PRISM_RADIUS), light0, light1, baseColor);
             } else {
-                renderRibbonSegment(buffer, entry, matrix, camera, a, b, ribbonSides[i], ribbonSides[i + 1], light0, light1);
+                renderRibbonSegment(buffer, entry, matrix, a, b, tangents[i], tangents[i + 1], frameA[i].scale(RIBBON_HALF_WIDTH), frameA[i + 1].scale(RIBBON_HALF_WIDTH), light0, light1, baseColor);
             }
         }
     }
@@ -154,54 +151,54 @@ public final class LeadRenderHandler {
         return new Vec3(point.x, point.y, point.z);
     }
 
-    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, Vec3 sideA, Vec3 sideB, int light0, int light1) {
-        Vec3 tangent = b.subtract(a);
-        if (tangent.lengthSqr() < 1.0e-8) {
-            return;
-        }
-        tangent = tangent.normalize();
-        Vec3 joinedSide = sideA.add(sideB);
-        if (joinedSide.lengthSqr() < 1.0e-8) {
-            joinedSide = sideA.lengthSqr() > 1.0e-8 ? sideA : sideB;
-        }
-        Vec3 normal = joinedSide.cross(tangent);
-        if (normal.lengthSqr() < 1.0e-8) {
-            normal = tangent.cross(camera.subtract(a));
-        }
+    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 a, Vec3 b, Vec3 tangentA, Vec3 tangentB, Vec3 sideA, Vec3 sideB, int light0, int light1, int color) {
+        Vec3 start = a.subtract(tangentA.scale(SEGMENT_OVERLAP));
+        Vec3 end = b.add(tangentB.scale(SEGMENT_OVERLAP));
+        Vec3 normal = tangentA.add(tangentB).scale(0.5).cross(sideA.add(sideB));
         if (normal.lengthSqr() < 1.0e-8) {
             normal = new Vec3(0.0, 1.0, 0.0);
         } else {
             normal = normal.normalize();
         }
+        Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vec3 a0 = start.add(sideA).subtract(camera);
+        Vec3 a1 = start.subtract(sideA).subtract(camera);
+        Vec3 b0 = end.add(sideB).subtract(camera);
+        Vec3 b1 = end.subtract(sideB).subtract(camera);
 
-        Vec3 a0 = a.add(sideA).subtract(camera);
-        Vec3 a1 = a.subtract(sideA).subtract(camera);
-        Vec3 b0 = b.add(sideB).subtract(camera);
-        Vec3 b1 = b.subtract(sideB).subtract(camera);
-
-        quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, DARK);
-        quad(buffer, entry, matrix, b0, b1, a1, a0, normal.scale(-1.0), light1, light0, LIGHT);
+        quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, color);
+        quad(buffer, entry, matrix, b0, b1, a1, a0, normal.scale(-1.0), light1, light0, color);
     }
 
-    private static void renderPrismSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, Vec3 widthA, Vec3 widthB, Vec3 heightA, Vec3 heightB, int light0, int light1) {
-        Vec3 topLeftA = a.subtract(widthA).add(heightA).subtract(camera);
-        Vec3 topRightA = a.add(widthA).add(heightA).subtract(camera);
-        Vec3 bottomLeftA = a.subtract(widthA).subtract(heightA).subtract(camera);
-        Vec3 bottomRightA = a.add(widthA).subtract(heightA).subtract(camera);
-        Vec3 topLeftB = b.subtract(widthB).add(heightB).subtract(camera);
-        Vec3 topRightB = b.add(widthB).add(heightB).subtract(camera);
-        Vec3 bottomLeftB = b.subtract(widthB).subtract(heightB).subtract(camera);
-        Vec3 bottomRightB = b.add(widthB).subtract(heightB).subtract(camera);
+    private static void renderPrismSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, Vec3 tangentA, Vec3 tangentB, Vec3 axisA0, Vec3 axisA1, Vec3 axisB0, Vec3 axisB1, int light0, int light1, int baseColor) {
+        Vec3 start = a.subtract(tangentA.scale(SEGMENT_OVERLAP));
+        Vec3 end = b.add(tangentB.scale(SEGMENT_OVERLAP));
+        Vec3 axisA = axisA0.add(axisA1);
+        if (axisA.lengthSqr() < 1.0e-8) {
+            axisA = axisA0.lengthSqr() > 1.0e-8 ? axisA0 : axisA1;
+        }
+        axisA = axisA.normalize().scale(PRISM_RADIUS);
+        Vec3 axisB = axisB0.add(axisB1);
+        if (axisB.lengthSqr() < 1.0e-8) {
+            axisB = axisB0.lengthSqr() > 1.0e-8 ? axisB0 : axisB1;
+        }
+        axisB = axisB.normalize().scale(PRISM_RADIUS);
 
-        Vec3 topNormal = heightA.add(heightB).normalize();
-        Vec3 bottomNormal = topNormal.scale(-1.0);
-        Vec3 leftNormal = widthA.add(widthB).normalize().scale(-1.0);
-        Vec3 rightNormal = leftNormal.scale(-1.0);
+        Vec3 a00 = start.add(axisA).add(axisB).subtract(camera);
+        Vec3 a01 = start.add(axisA).subtract(axisB).subtract(camera);
+        Vec3 a10 = start.subtract(axisA).subtract(axisB).subtract(camera);
+        Vec3 a11 = start.subtract(axisA).add(axisB).subtract(camera);
+        Vec3 b00 = end.add(axisA).add(axisB).subtract(camera);
+        Vec3 b01 = end.add(axisA).subtract(axisB).subtract(camera);
+        Vec3 b10 = end.subtract(axisA).subtract(axisB).subtract(camera);
+        Vec3 b11 = end.subtract(axisA).add(axisB).subtract(camera);
 
-        quad(buffer, entry, matrix, topLeftA, topRightA, topRightB, topLeftB, topNormal, light0, light1, DARK);
-        quad(buffer, entry, matrix, bottomRightA, bottomLeftA, bottomLeftB, bottomRightB, bottomNormal, light0, light1, LIGHT);
-        quad(buffer, entry, matrix, bottomLeftA, topLeftA, topLeftB, bottomLeftB, leftNormal, light0, light1, DARK);
-        quad(buffer, entry, matrix, topRightA, bottomRightA, bottomRightB, topRightB, rightNormal, light0, light1, LIGHT);
+        Vec3 normalA = axisA.normalize();
+        Vec3 normalB = axisB.normalize();
+        quad(buffer, entry, matrix, a00, a01, b01, b00, normalA, light0, light1, baseColor);
+        quad(buffer, entry, matrix, a01, a10, b10, b01, normalB.scale(-1.0), light0, light1, baseColor);
+        quad(buffer, entry, matrix, a10, a11, b11, b10, normalA.scale(-1.0), light0, light1, baseColor);
+        quad(buffer, entry, matrix, a11, a00, b00, b11, normalB, light0, light1, baseColor);
     }
 
     private static void quad(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 p1, Vec3 p2, Vec3 p3, Vec3 p4, Vec3 normal, int light0, int light1, int color) {
@@ -217,5 +214,4 @@ public final class LeadRenderHandler {
             .setLight(light)
             .setNormal(entry, (float) normal.x, (float) normal.y, (float) normal.z);
     }
-
 }
