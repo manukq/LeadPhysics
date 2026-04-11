@@ -85,6 +85,7 @@ public final class LeadRenderHandler {
             tangents[i] = tangent;
         }
 
+
         Vec3 reference = Math.abs(tangents[0].y) > 0.9 ? new Vec3(0.0, 0.0, 1.0) : new Vec3(0.0, 1.0, 0.0);
         Vec3 axisA = tangents[0].cross(reference);
         if (axisA.lengthSqr() < 1.0e-8) {
@@ -128,12 +129,12 @@ public final class LeadRenderHandler {
             float progress0 = (float) i / (points.length - 1);
             float progress1 = (float) (i + 1) / (points.length - 1);
             int light0 = LightTexture.pack(
-                Mth.lerpInt(progress0, startBlockLight, endBlockLight),
-                Mth.lerpInt(progress0, startSkyLight, endSkyLight)
+                    Mth.lerpInt(progress0, startBlockLight, endBlockLight),
+                    Mth.lerpInt(progress0, startSkyLight, endSkyLight)
             );
             int light1 = LightTexture.pack(
-                Mth.lerpInt(progress1, startBlockLight, endBlockLight),
-                Mth.lerpInt(progress1, startSkyLight, endSkyLight)
+                    Mth.lerpInt(progress1, startBlockLight, endBlockLight),
+                    Mth.lerpInt(progress1, startSkyLight, endSkyLight)
             );
 
             Vec3 a = centers[i];
@@ -142,7 +143,7 @@ public final class LeadRenderHandler {
             if (config.isThreeDimensional()) {
                 renderPrismSegment(buffer, entry, matrix, camera, a, b, tangents[i], tangents[i + 1], frameA[i].scale(PRISM_RADIUS), frameA[i + 1].scale(PRISM_RADIUS), frameB[i].scale(PRISM_RADIUS), frameB[i + 1].scale(PRISM_RADIUS), light0, light1, baseColor);
             } else {
-                renderRibbonSegment(buffer, entry, matrix, a, b, tangents[i], tangents[i + 1], frameA[i].scale(RIBBON_HALF_WIDTH), frameA[i + 1].scale(RIBBON_HALF_WIDTH), light0, light1, baseColor);
+                renderRibbonSegment(buffer, entry, matrix, camera, a, b, frameA[i].scale(RIBBON_HALF_WIDTH), frameA[i + 1].scale(RIBBON_HALF_WIDTH), light0, light1, baseColor);
             }
         }
     }
@@ -151,23 +152,33 @@ public final class LeadRenderHandler {
         return new Vec3(point.x, point.y, point.z);
     }
 
-    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 a, Vec3 b, Vec3 tangentA, Vec3 tangentB, Vec3 sideA, Vec3 sideB, int light0, int light1, int color) {
-        Vec3 start = a.subtract(tangentA.scale(SEGMENT_OVERLAP));
-        Vec3 end = b.add(tangentB.scale(SEGMENT_OVERLAP));
-        Vec3 normal = tangentA.add(tangentB).scale(0.5).cross(sideA.add(sideB));
+
+    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, Vec3 sideA, Vec3 sideB, int light0, int light1, int color) {
+        Vec3 tangent = b.subtract(a);
+        if (tangent.lengthSqr() < 1.0e-8) {
+            return;
+        }
+        tangent = tangent.normalize();
+        Vec3 side = sideA.add(sideB);
+        if (side.lengthSqr() < 1.0e-8) {
+            side = sideA.lengthSqr() > 1.0e-8 ? sideA : sideB;
+        }
+        side = side.normalize().scale(RIBBON_HALF_WIDTH);
+        Vec3 normal = side.cross(tangent);
         if (normal.lengthSqr() < 1.0e-8) {
-            normal = new Vec3(0.0, 1.0, 0.0);
+            normal = tangent.cross(new Vec3(0.0, 1.0, 0.0));
+        }
+        if (normal.lengthSqr() < 1.0e-8) {
+            normal = new Vec3(0.0, 0.0, 1.0);
         } else {
             normal = normal.normalize();
         }
-        Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-        Vec3 a0 = start.add(sideA).subtract(camera);
-        Vec3 a1 = start.subtract(sideA).subtract(camera);
-        Vec3 b0 = end.add(sideB).subtract(camera);
-        Vec3 b1 = end.subtract(sideB).subtract(camera);
+        Vec3 a0 = a.add(side).subtract(camera);
+        Vec3 a1 = a.subtract(side).subtract(camera);
+        Vec3 b0 = b.add(side).subtract(camera);
+        Vec3 b1 = b.subtract(side).subtract(camera);
 
         quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, color);
-        quad(buffer, entry, matrix, b0, b1, a1, a0, normal.scale(-1.0), light1, light0, color);
     }
 
     private static void renderPrismSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 camera, Vec3 a, Vec3 b, Vec3 tangentA, Vec3 tangentB, Vec3 axisA0, Vec3 axisA1, Vec3 axisB0, Vec3 axisB1, int light0, int light1, int baseColor) {
@@ -210,8 +221,8 @@ public final class LeadRenderHandler {
 
     private static void vertex(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix, Vec3 position, int light, Vec3 normal, int color) {
         buffer.addVertex(matrix, (float) position.x, (float) position.y, (float) position.z)
-            .setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, ALPHA)
-            .setLight(light)
-            .setNormal(entry, (float) normal.x, (float) normal.y, (float) normal.z);
+                .setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, ALPHA)
+                .setLight(light)
+                .setNormal(entry, (float) normal.x, (float) normal.y, (float) normal.z);
     }
 }

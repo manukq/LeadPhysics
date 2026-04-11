@@ -46,29 +46,29 @@ public final class LeadPhysicsConfigScreen extends Screen {
     @Override
     protected void init() {
         LeadPhysicsConfig config = LeadPhysicsConfig.getInstance();
-        int panelWidth = 320;
+        int panelWidth = 240;
         int left = (width - panelWidth) / 2;
-        int y = 46;
+        int y = height / 6;
 
         enabledButton = addRenderableWidget(CycleButton.onOffBuilder(config.isEnabled())
             .create(left, y, panelWidth, 20, Component.literal("Mod Enabled"), (button, value) -> {}));
-        y += 28;
+        y += 24;
 
         renderModeButton = addRenderableWidget(CycleButton.builder(this::modeName)
             .withValues(LeadPhysicsConfig.RenderMode.values())
             .withInitialValue(config.getRenderMode())
             .create(left, y, panelWidth, 20, Component.literal("Lead Render"), (button, value) -> {}));
-        y += 28;
+        y += 24;
 
         blockCollisionButton = addRenderableWidget(CycleButton.onOffBuilder(config.isBlockCollisionEnabled())
             .create(left, y, panelWidth, 20, Component.literal("Block Collision"), (button, value) -> {}));
-        y += 28;
+        y += 24;
 
         amplitudeButton = addRenderableWidget(CycleButton.builder(this::amplitudeName)
             .withValues(AMPLITUDES)
             .withInitialValue(closestAmplitude(config.getPhysicsAmplitude()))
             .create(left, y, panelWidth, 20, Component.literal("Physics Strength"), (button, value) -> {}));
-        y += 28;
+        y += 30;
 
         int buttonWidth = (panelWidth - 8) / 2;
         saveButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> saveAndClose())
@@ -84,24 +84,19 @@ public final class LeadPhysicsConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        guiGraphics.fillGradient(0, 0, width, height, 0xC0101018, 0xD0101018);
-        int panelLeft = (width - 344) / 2;
-        int panelTop = 16;
-        int panelBottom = Math.min(height - 16, 16 + 260);
-        guiGraphics.fill(panelLeft, panelTop, panelLeft + 344, panelBottom, 0xB018181C);
-        guiGraphics.renderOutline(panelLeft, panelTop, 344, panelBottom - panelTop, 0xFF3A2A1E);
+        guiGraphics.fill(0, 0, width, height, 0);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
-        int left = (width - 320) / 2;
-        int y = 20;
-        guiGraphics.drawCenteredString(font, title, width / 2, y, 0xFFFFFF);
-        guiGraphics.drawString(font, Component.literal("Choose the overall swing strength of the lead."), left, 102, 0xA0A0A0);
+        int left = (width - 240) / 2;
+        int headerY = height / 6 - 18;
+        guiGraphics.drawCenteredString(font, title, width / 2, 20, 0xFFFFFF);
+        guiGraphics.drawCenteredString(font, Component.literal("Lead physics settings"), width / 2, 32, 0xA0A0A0);
+        guiGraphics.drawString(font, Component.literal("Credits"), left, headerY + 130, 0xFFFFFF);
 
-        int creditsTop = 136;
-        guiGraphics.drawString(font, Component.literal("Credits").withStyle(ChatFormatting.GOLD), left, creditsTop, 0xFFD76A);
+        int creditsTop = headerY + 144;
         int textY = creditsTop + 14;
         for (Component line : credits) {
-            guiGraphics.drawWordWrap(font, line, left, textY, 320, 0xE0E0E0);
+            guiGraphics.drawWordWrap(font, line, left, textY, 240, 0xFFFFFF);
             textY += Math.max(12, font.wordWrapHeight(line, 320) + 2);
             if (textY > height - 12) {
                 break;
