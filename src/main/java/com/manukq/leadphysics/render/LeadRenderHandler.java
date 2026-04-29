@@ -55,12 +55,12 @@ public final class LeadRenderHandler {
 
         BlockPos startLightPos = BlockPos.containing(start);
         BlockPos endLightPos   = BlockPos.containing(realEnd);
-        int startBlockLight = entity.level()     .getBrightness(LightLayer.BLOCK, startLightPos);
+        int startBlockLight = entity.level().getBrightness(LightLayer.BLOCK, startLightPos);
         int endBlockLight   = leashHolder.level().getBrightness(LightLayer.BLOCK, endLightPos);
-        int startSkyLight   = entity.level()     .getBrightness(LightLayer.SKY,   startLightPos);
-        int endSkyLight     = leashHolder.level().getBrightness(LightLayer.SKY,   endLightPos);
+        int startSkyLight   = entity.level().getBrightness(LightLayer.SKY, startLightPos);
+        int endSkyLight     = leashHolder.level().getBrightness(LightLayer.SKY, endLightPos);
 
-        int    n       = points.length;
+        int n = points.length;
         Vec3[] centers = new Vec3[n];
         for (int i = 0; i < n; i++) {
             centers[i] = new Vec3(points[i].x, points[i].y, points[i].z);
@@ -78,30 +78,14 @@ public final class LeadRenderHandler {
     private static void render2D(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix,
                                  Vec3 camera, Vec3[] centers, int n,
                                  int startBlockLight, int endBlockLight,
-                                 int startSkyLight,   int endSkyLight) {
-
-        Vec3 globalToCam = camera.subtract(centers[n / 2]).normalize();
-        if (globalToCam.lengthSqr() < 1e-8) {
-            globalToCam = new Vec3(0, 0, 1);
-        }
+                                 int startSkyLight, int endSkyLight) {
 
         Vec3[] sides = new Vec3[n];
         for (int i = 0; i < n; i++) {
-            Vec3 tangent;
-            if (i == 0)        tangent = centers[1].subtract(centers[0]);
-            else if (i == n-1) tangent = centers[n-1].subtract(centers[n-2]);
-            else               tangent = centers[i+1].subtract(centers[i-1]);
-
-            if (tangent.lengthSqr() < 1e-8) tangent = new Vec3(1, 0, 0);
-            else tangent = tangent.normalize();
-
-            Vec3 side = tangent.cross(globalToCam);
-
-            if (side.lengthSqr() < 1e-8) {
-                side = tangent.cross(new Vec3(0, 1, 0));
-                if (side.lengthSqr() < 1e-8) side = tangent.cross(new Vec3(0, 0, 1));
-            }
-
+            Vec3 tangent = avgTangent(centers, i, n);
+            Vec3 side = tangent.cross(new Vec3(0.0, 1.0, 0.0));
+            if (side.lengthSqr() < 1e-6) side = tangent.cross(new Vec3(0.0, 0.0, 1.0));
+            if (side.lengthSqr() < 1e-6) side = tangent.cross(new Vec3(1.0, 0.0, 0.0));
             sides[i] = side.normalize().scale(RIBBON_HALF_WIDTH);
         }
 
@@ -110,68 +94,67 @@ public final class LeadRenderHandler {
             Vec3 b = centers[i + 1];
             if (a.distanceToSqr(b) < 1e-8) continue;
 
-            float p0 = (float) i       / (n - 1);
+            float p0 = (float) i / (n - 1);
             float p1 = (float) (i + 1) / (n - 1);
             int light0 = LightTexture.pack(
                     Mth.lerpInt(p0, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p0, startSkyLight,   endSkyLight));
+                    Mth.lerpInt(p0, startSkyLight, endSkyLight));
             int light1 = LightTexture.pack(
                     Mth.lerpInt(p1, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p1, startSkyLight,   endSkyLight));
+                    Mth.lerpInt(p1, startSkyLight, endSkyLight));
             int color = (i & 1) == 0 ? DARK : LIGHT;
 
-            renderRibbonSegment(buffer, entry, matrix, camera,
-                    a, b, sides[i], sides[i + 1], light0, light1, color);
+            Vec3 q0 = a.add(sides[i]).subtract(camera);
+            Vec3 q1 = a.subtract(sides[i]).subtract(camera);
+            Vec3 q2 = b.subtract(sides[i + 1]).subtract(camera);
+            Vec3 q3 = b.add(sides[i + 1]).subtract(camera);
+
+            Vec3 normal = q1.subtract(q0).cross(q3.subtract(q0));
+            if (normal.lengthSqr() < 1e-8) continue;
+            normal = normal.normalize();
+
+            vertex(buffer, entry, matrix, q0, light0, normal, color);
+            vertex(buffer, entry, matrix, q1, light0, normal, color);
+            vertex(buffer, entry, matrix, q2, light1, normal, color);
+            vertex(buffer, entry, matrix, q3, light1, normal, color);
         }
     }
 
-    private static void renderRibbonSegment(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix,
-                                            Vec3 camera, Vec3 a, Vec3 b,
-                                            Vec3 sideA, Vec3 sideB,
-                                            int light0, int light1, int color) {
-        Vec3 midPoint = a.add(b).scale(0.5);
-        Vec3 normal   = camera.subtract(midPoint).normalize();
-
-        Vec3 a0 = a.add(sideA).subtract(camera);
-        Vec3 a1 = a.subtract(sideA).subtract(camera);
-        Vec3 b0 = b.add(sideB).subtract(camera);
-        Vec3 b1 = b.subtract(sideB).subtract(camera);
-
-        quad(buffer, entry, matrix, a0, a1, b1, b0, normal, light0, light1, color);
-        quad(buffer, entry, matrix, b0, b1, a1, a0, normal.scale(-1.0), light1, light0, color);
+    private static Vec3 avgTangent(Vec3[] centers, int i, int n) {
+        Vec3 t;
+        if (i == 0) t = centers[1].subtract(centers[0]);
+        else if (i == n - 1) t = centers[n - 1].subtract(centers[n - 2]);
+        else t = centers[i + 1].subtract(centers[i - 1]);
+        return t.lengthSqr() < 1e-8 ? new Vec3(1.0, 0.0, 0.0) : t.normalize();
     }
 
     private static void render3D(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix,
                                  Vec3 camera, Vec3[] centers, int n,
                                  int startBlockLight, int endBlockLight,
-                                 int startSkyLight,   int endSkyLight) {
+                                 int startSkyLight, int endSkyLight) {
 
         Vec3[] tangents = new Vec3[n];
         for (int k = 0; k < n; k++) {
-            Vec3 t;
-            if      (k == 0)     t = centers[1].subtract(centers[0]);
-            else if (k == n - 1) t = centers[k].subtract(centers[k - 1]);
-            else                 t = centers[k + 1].subtract(centers[k - 1]);
-            tangents[k] = t.lengthSqr() < 1e-8 ? new Vec3(1, 0, 0) : t.normalize();
+            tangents[k] = avgTangent(centers, k, n);
         }
 
         Vec3[] frameA = new Vec3[n];
         Vec3[] frameB = new Vec3[n];
         Vec3 ref = Math.abs(tangents[0].y) > 0.9 ? new Vec3(0, 0, 1) : new Vec3(0, 1, 0);
-        Vec3 axisA0 = tangents[0].cross(ref);
-        if (axisA0.lengthSqr() < 1e-8) axisA0 = tangents[0].cross(new Vec3(1, 0, 0));
-        axisA0    = axisA0.normalize();
-        frameA[0] = axisA0;
-        frameB[0] = tangents[0].cross(axisA0).normalize();
+        Vec3 a0 = tangents[0].cross(ref);
+        if (a0.lengthSqr() < 1e-8) a0 = tangents[0].cross(new Vec3(1, 0, 0));
+        a0 = a0.normalize();
+        frameA[0] = a0;
+        frameB[0] = tangents[0].cross(a0).normalize();
 
         for (int k = 1; k < n; k++) {
-            Vec3 t  = tangents[k];
+            Vec3 t = tangents[k];
             Vec3 fa = frameA[k - 1].subtract(t.scale(frameA[k - 1].dot(t)));
             if (fa.lengthSqr() < 1e-8) fa = tangents[k - 1].cross(t);
             if (fa.lengthSqr() < 1e-8) fa = t.cross(frameB[k - 1]);
             if (fa.lengthSqr() < 1e-8) {
-                Vec3 fb2 = Math.abs(t.y) > 0.9 ? new Vec3(0, 0, 1) : new Vec3(0, 1, 0);
-                fa = t.cross(fb2);
+                Vec3 f2 = Math.abs(t.y) > 0.9 ? new Vec3(0, 0, 1) : new Vec3(0, 1, 0);
+                fa = t.cross(f2);
             }
             fa = fa.normalize();
             if (fa.dot(frameA[k - 1]) < 0) fa = fa.scale(-1);
@@ -185,14 +168,14 @@ public final class LeadRenderHandler {
             Vec3 b = centers[i + 1];
             if (a.distanceToSqr(b) < 1e-8) continue;
 
-            float p0 = (float) i       / (n - 1);
+            float p0 = (float) i / (n - 1);
             float p1 = (float) (i + 1) / (n - 1);
             int light0 = LightTexture.pack(
                     Mth.lerpInt(p0, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p0, startSkyLight,   endSkyLight));
+                    Mth.lerpInt(p0, startSkyLight, endSkyLight));
             int light1 = LightTexture.pack(
                     Mth.lerpInt(p1, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p1, startSkyLight,   endSkyLight));
+                    Mth.lerpInt(p1, startSkyLight, endSkyLight));
             int color = (i & 1) == 0 ? DARK : LIGHT;
 
             renderPrismSegment(buffer, entry, matrix, camera, a, b,
@@ -210,7 +193,7 @@ public final class LeadRenderHandler {
                                            Vec3 axisB0, Vec3 axisB1,
                                            int light0, int light1, int baseColor) {
         Vec3 start = a.subtract(tangentA.scale(SEGMENT_OVERLAP));
-        Vec3 end   = b.add(tangentB.scale(SEGMENT_OVERLAP));
+        Vec3 end = b.add(tangentB.scale(SEGMENT_OVERLAP));
 
         Vec3 axisA = axisA0.add(axisA1);
         if (axisA.lengthSqr() < 1e-8) axisA = axisA0.lengthSqr() > 1e-8 ? axisA0 : axisA1;
@@ -231,10 +214,10 @@ public final class LeadRenderHandler {
 
         Vec3 nA = axisA.normalize();
         Vec3 nB = axisB.normalize();
-        quad(buffer, entry, matrix, a00, a01, b01, b00, nA,           light0, light1, baseColor);
+        quad(buffer, entry, matrix, a00, a01, b01, b00, nA, light0, light1, baseColor);
         quad(buffer, entry, matrix, a01, a10, b10, b01, nB.scale(-1), light0, light1, baseColor);
         quad(buffer, entry, matrix, a10, a11, b11, b10, nA.scale(-1), light0, light1, baseColor);
-        quad(buffer, entry, matrix, a11, a00, b00, b11, nB,           light0, light1, baseColor);
+        quad(buffer, entry, matrix, a11, a00, b00, b11, nB, light0, light1, baseColor);
     }
 
     private static void quad(VertexConsumer buffer, PoseStack.Pose entry, Matrix4f matrix,
