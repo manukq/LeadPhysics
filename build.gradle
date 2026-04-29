@@ -6,6 +6,10 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 
+loom {
+    enableModProvidedJavadoc = false
+}
+
 repositories {
     mavenCentral()
     maven {
@@ -42,6 +46,6 @@ java {
 
 jar {
     from("LICENSE") {
-        rename { "${it}_${project.archivesBaseName}" }
+        rename { "${it}_${project.archives_base_name}" }
     }
 }
