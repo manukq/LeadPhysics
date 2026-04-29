@@ -8,11 +8,11 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Brightness;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.level.LightLayer;
@@ -112,12 +112,12 @@ public final class LeadRenderHandler {
 
             float p0 = (float) i       / (n - 1);
             float p1 = (float) (i + 1) / (n - 1);
-            int light0 = LightTexture.pack(
+            int light0 = new Brightness(
                     Mth.lerpInt(p0, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p0, startSkyLight,   endSkyLight));
-            int light1 = LightTexture.pack(
+                    Mth.lerpInt(p0, startSkyLight,   endSkyLight)).pack();
+            int light1 = new Brightness(
                     Mth.lerpInt(p1, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p1, startSkyLight,   endSkyLight));
+                    Mth.lerpInt(p1, startSkyLight,   endSkyLight)).pack();
             int color = (i & 1) == 0 ? DARK : LIGHT;
 
             renderRibbonSegment(buffer, entry, matrix, camera,
@@ -187,12 +187,12 @@ public final class LeadRenderHandler {
 
             float p0 = (float) i       / (n - 1);
             float p1 = (float) (i + 1) / (n - 1);
-            int light0 = LightTexture.pack(
+            int light0 = new Brightness(
                     Mth.lerpInt(p0, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p0, startSkyLight,   endSkyLight));
-            int light1 = LightTexture.pack(
+                    Mth.lerpInt(p0, startSkyLight,   endSkyLight)).pack();
+            int light1 = new Brightness(
                     Mth.lerpInt(p1, startBlockLight, endBlockLight),
-                    Mth.lerpInt(p1, startSkyLight,   endSkyLight));
+                    Mth.lerpInt(p1, startSkyLight,   endSkyLight)).pack();
             int color = (i & 1) == 0 ? DARK : LIGHT;
 
             renderPrismSegment(buffer, entry, matrix, camera, a, b,

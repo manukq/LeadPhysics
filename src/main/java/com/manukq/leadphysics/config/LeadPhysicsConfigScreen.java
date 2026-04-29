@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
@@ -82,21 +82,21 @@ public final class LeadPhysicsConfigScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         guiGraphics.fill(0, 0, width, height, 0);
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
 
         int left = (width - 240) / 2;
         int headerY = height / 6 - 18;
-        guiGraphics.drawCenteredString(font, title, width / 2, 20, 0xFFFFFF);
-        guiGraphics.drawCenteredString(font, Component.literal("Lead physics settings"), width / 2, 32, 0xA0A0A0);
-        guiGraphics.drawString(font, Component.literal("Credits"), left, headerY + 130, 0xFFFFFF);
+        guiGraphics.centeredText(font, title, width / 2, 20, 0xFFFFFF);
+        guiGraphics.centeredText(font, Component.literal("Lead physics settings"), width / 2, 32, 0xA0A0A0);
+        guiGraphics.text(font, Component.literal("Credits"), left, headerY + 130, 0xFFFFFF);
 
         int creditsTop = headerY + 144;
         int textY = creditsTop + 14;
         for (Component line : credits) {
-            guiGraphics.drawWordWrap(font, line, left, textY, 240, 0xFFFFFF);
-            textY += Math.max(12, font.wordWrapHeight(line, 320) + 2);
+            guiGraphics.textWithWordWrap(font, line, left, textY, 240, 0xFFFFFF);
+            textY += Math.max(12, font.wordWrapHeight(line, 240) + 2);
             if (textY > height - 12) {
                 break;
             }

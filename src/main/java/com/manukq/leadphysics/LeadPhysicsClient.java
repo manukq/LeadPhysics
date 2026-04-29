@@ -11,7 +11,7 @@ public final class LeadPhysicsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         LeadPhysicsConfig.getInstance().load();
-        ClientTickEvents.END_WORLD_TICK.register(world -> LeadStateManager.getInstance().tick());
+        ClientTickEvents.END_LEVEL_TICK.register(world -> LeadStateManager.getInstance().tick());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> LeadStateManager.getInstance().clear());
     }
 }
