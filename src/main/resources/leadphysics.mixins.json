@@ -4,7 +4,6 @@
   "package": "com.manukq.leadphysics.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "EntityRenderDispatcherMixin",
     "EntityRendererMixin"
   ],
   "injectors": {
