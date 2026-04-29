@@ -3,10 +3,23 @@
   "id": "leadphysics",
   "version": "${version}",
   "name": "LeadPhysics",
-  "description": "Physical lead simulation with configurable rendering and collisions.",
+  "description": "Physical lead simulation with configurable rendering and collisions. Not changes vanilla lead physics.",
   "icon": "assets/leadphysics/icon.png",
   "authors": [
-    "Manukq"
+    {
+      "name": "Manukq",
+      "contact": {
+        "homepage": "https://t.me/ugolokmanukq"
+      }
+    }
+  ],
+  "contributors": [
+    {
+      "name": "mabron (Logo)",
+      "contact": {
+        "homepage": "https://t.me/mabcave"
+      }
+    }
   ],
   "license": "MIT",
   "environment": "client",
@@ -17,7 +30,9 @@
   "custom": {
     "modmenu": {
       "links": {
-        "modmenu.github": "https://github.com/manukek/LeadPhysics"
+        "Modrinth": "https://modrinth.com/project/leadphysics",
+        "Curseforge": "https://curseforge.com/minecraft/mc-mods/leadphysics",
+        "Logo by mabron": "https://t.me/mabcave"
       }
     }
   },
