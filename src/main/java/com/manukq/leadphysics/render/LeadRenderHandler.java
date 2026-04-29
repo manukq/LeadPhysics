@@ -10,7 +10,7 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -48,10 +48,10 @@ public final class LeadRenderHandler {
         RopePoint[] points = simulator.getPoints();
         if (points == null || points.length < 2) return;
 
-        VertexConsumer buffer = buffers.getBuffer(RenderType.leash());
+        VertexConsumer buffer = buffers.getBuffer(RenderTypes.leash());
         PoseStack.Pose entry  = poseStack.last();
         Matrix4f       matrix = entry.pose();
-        Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().position();
 
         BlockPos startLightPos = BlockPos.containing(start);
         BlockPos endLightPos   = BlockPos.containing(realEnd);

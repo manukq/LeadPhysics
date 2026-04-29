@@ -19,7 +19,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public final class LeadPhysicsConfigScreen extends Screen {
 
@@ -55,9 +55,8 @@ public final class LeadPhysicsConfigScreen extends Screen {
             .create(left, y, panelWidth, 20, Component.literal("Mod Enabled"), (button, value) -> {}));
         y += 24;
 
-        renderModeButton = addRenderableWidget(CycleButton.builder(this::modeName)
+        renderModeButton = addRenderableWidget(CycleButton.builder(this::modeName, config.getRenderMode())
             .withValues(LeadPhysicsConfig.RenderMode.values())
-            .withInitialValue(config.getRenderMode())
             .create(left, y, panelWidth, 20, Component.literal("Lead Render"), (button, value) -> {}));
         y += 24;
 
@@ -65,9 +64,8 @@ public final class LeadPhysicsConfigScreen extends Screen {
             .create(left, y, panelWidth, 20, Component.literal("Block Collision"), (button, value) -> {}));
         y += 24;
 
-        amplitudeButton = addRenderableWidget(CycleButton.builder(this::amplitudeName)
+        amplitudeButton = addRenderableWidget(CycleButton.builder(this::amplitudeName, closestAmplitude(config.getPhysicsAmplitude()))
             .withValues(AMPLITUDES)
-            .withInitialValue(closestAmplitude(config.getPhysicsAmplitude()))
             .create(left, y, panelWidth, 20, Component.literal("Physics Strength"), (button, value) -> {}));
         y += 30;
 
@@ -172,7 +170,7 @@ public final class LeadPhysicsConfigScreen extends Screen {
 
     private List<Component> readCredits() {
         List<Component> lines = new ArrayList<>();
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath("leadphysics", "credits.md");
+        Identifier id = Identifier.fromNamespaceAndPath("leadphysics", "credits.md");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(Minecraft.getInstance().getResourceManager().open(id), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
