@@ -21,6 +21,7 @@ import org.joml.Matrix4f;
 
 public final class LeadRenderHandler {
 
+    private static final float  DEG_TO_RAD        = 0.017453292f;
     private static final float  RIBBON_HALF_WIDTH = 0.042f;
     private static final float  PRISM_RADIUS      = 0.023f;
     private static final double SEGMENT_OVERLAP   = 0.0015;
@@ -35,7 +36,8 @@ public final class LeadRenderHandler {
         LeadPhysicsConfig config = LeadPhysicsConfig.getInstance();
         if (!config.isEnabled()) return;
 
-        Vec3 start   = entity.getPosition(tickDelta).add(leashable.getLeashOffset(tickDelta));
+        Vec3 startOffset = leashable.getLeashOffset(tickDelta).yRot(-entity.getPreciseBodyRotation(tickDelta) * DEG_TO_RAD);
+        Vec3 start   = entity.getPosition(tickDelta).add(startOffset);
         Vec3 realEnd = leashHolder.getRopeHoldPosition(tickDelta);
         UUID id      = entity.getUUID();
 
