@@ -34,6 +34,7 @@ Available port branches and builds:
 - `1.21.10`
 - `1.21.11`
 - `26.1`
+- `26.2`
 
 ## Links
 
