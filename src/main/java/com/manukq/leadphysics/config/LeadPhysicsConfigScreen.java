@@ -105,7 +105,7 @@ public final class LeadPhysicsConfigScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == 257 || event.key() == 335) {
+        if (event.isConfirmation()) {
             saveAndClose();
             return true;
         }
